@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -411,6 +412,8 @@ func testTransactionPropagation(t *testing.T, protocol uint) {
 
 		sinks[i].handler.acceptTxs = 1 // mark synced to accept transactions
 	}
+	wgPeers := sync.WaitGroup{}
+	wgPeers.Add(10)
 	// Interconnect all the sink handlers with the source handler
 	for i, sink := range sinks {
 		sink := sink // Closure for gorotuine below
@@ -448,9 +451,16 @@ func testTransactionPropagation(t *testing.T, protocol uint) {
 		txs[nonce] = tx
 	}
 	source.txpool.AddRemotes(txs)
-
 	// Iterate through all the sinks and ensure they all got the transactions
-	for i := range sinks {
+	for i, sink := range sinks {
+		go func(p *ethPeer) {
+			t.Log("Entered peer 1 listening for message")
+			for e := p.ExpectPeerMessage(uint64(eth.TransactionsMsg), txs); e != nil; {
+				t.Log("HHHHHHHHH", e)
+			}
+			t.Log("QQQQQQQQQQQQQQQQQQQ")
+			wgPeers.Done()
+		}(sink.handler.peers.peer(enode.ID{byte(0)}.String()))
 		for arrived := 0; arrived < len(txs); {
 			select {
 			case event := <-txChs[i]:
@@ -460,6 +470,7 @@ func testTransactionPropagation(t *testing.T, protocol uint) {
 			}
 		}
 	}
+	wgPeers.Wait()
 }
 
 // Tests that post eth protocol handshake, clients perform a mutual checkpoint

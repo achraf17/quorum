@@ -191,6 +191,7 @@ func (p *Peer) markTransaction(hash common.Hash) {
 // The reasons this is public is to allow packages using this protocol to write
 // tests that directly send messages without having to do the asyn queueing.
 func (p *Peer) SendTransactions(txs types.Transactions) error {
+	p.Log().Info("WWWWWWWWWWWWWWW", "hash", txs[0].Hash(), "exist", p.txpool.Get(txs[0].Hash()) != nil)
 	// Mark all the transactions as known, but ensure we don't overflow our limits
 	for p.knownTxs.Cardinality() > max(0, maxKnownTxs-len(txs)) {
 		p.knownTxs.Pop()
@@ -471,6 +472,10 @@ func (p *Peer) ExpectRequestHeadersByNumber(origin uint64, amount int, skip int,
 		Reverse: reverse,
 	}
 	return p2p.ExpectMsg(p.rw, GetBlockHeadersMsg, req)
+}
+
+func (p *Peer) ExpectPeerMessage(msg uint64, content types.Transactions) error {
+	return p2p.ExpectMsg(p.rw, msg, content)
 }
 
 // RequestBodies fetches a batch of blocks' bodies corresponding to the hashes
